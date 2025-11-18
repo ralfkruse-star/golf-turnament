@@ -36,7 +36,9 @@
     "@radix-ui/react-select": "^2.1.2",
     "@radix-ui/react-tabs": "^1.1.1",
     "@radix-ui/react-toast": "^1.2.2",
-    "@getbrevo/brevo": "^2.2.0"
+    "@getbrevo/brevo": "^2.2.0",
+    "stripe": "^17.3.1",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
@@ -57,7 +59,8 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@playwright/test": "^1.49.1",
     "jsdom": "^25.0.1",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "@types/qrcode": "^1.5.5"
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
