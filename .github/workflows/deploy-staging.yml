@@ -48,7 +48,7 @@ jobs:
           NEXTAUTH_URL: ${{ secrets.STAGING_NEXTAUTH_URL }}
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: staging-build
           path: |
