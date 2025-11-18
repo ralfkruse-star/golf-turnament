@@ -7,9 +7,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import { emailService } from '@/infrastructure/services/email-service'
+import { ClubService } from '@/infrastructure/services/club-service'
 import Stripe from 'stripe'
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+const clubService = new ClubService(prisma)
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,6 +42,27 @@ export async function POST(request: NextRequest) {
 
       case 'payment_intent.payment_failed':
         console.log('PaymentIntent failed:', event.data.object.id)
+        break
+
+      // Club subscription events
+      case 'customer.subscription.created':
+        await handleSubscriptionCreated(event.data.object as Stripe.Subscription)
+        break
+
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription)
+        break
+
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
+        break
+
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
+        break
+
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
         break
 
       default:
@@ -98,6 +121,162 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   } catch (error) {
     console.error('Failed to update registration:', error)
   }
+}
+
+/**
+ * Handle subscription created
+ */
+async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
+  const clubId = subscription.metadata?.clubId
+
+  if (!clubId) {
+    console.error('No clubId in subscription metadata')
+    return
+  }
+
+  try {
+    // Map Stripe product/price to tier
+    const tier = mapPriceToTier(subscription.items.data[0].price.id)
+
+    // Calculate active until date
+    const activeUntil = new Date(subscription.current_period_end * 1000)
+
+    // Update club
+    await clubService.syncStripeSubscription(clubId, {
+      subscriptionId: subscription.id,
+      tier,
+      activeUntil,
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+    })
+
+    console.log(`Subscription ${subscription.id} created for club ${clubId}`)
+  } catch (error) {
+    console.error('Failed to handle subscription created:', error)
+  }
+}
+
+/**
+ * Handle subscription updated
+ */
+async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  const clubId = subscription.metadata?.clubId
+
+  if (!clubId) {
+    console.error('No clubId in subscription metadata')
+    return
+  }
+
+  try {
+    const tier = mapPriceToTier(subscription.items.data[0].price.id)
+    const activeUntil = new Date(subscription.current_period_end * 1000)
+
+    await clubService.syncStripeSubscription(clubId, {
+      subscriptionId: subscription.id,
+      tier,
+      activeUntil,
+    })
+
+    // If subscription is canceled, suspend club
+    if (subscription.status === 'canceled' || subscription.cancel_at_period_end) {
+      // Don't suspend immediately, wait until period ends
+      console.log(`Subscription ${subscription.id} will cancel at period end`)
+    }
+
+    console.log(`Subscription ${subscription.id} updated for club ${clubId}`)
+  } catch (error) {
+    console.error('Failed to handle subscription updated:', error)
+  }
+}
+
+/**
+ * Handle subscription deleted
+ */
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const clubId = subscription.metadata?.clubId
+
+  if (!clubId) {
+    console.error('No clubId in subscription metadata')
+    return
+  }
+
+  try {
+    // Downgrade to FREE tier
+    await clubService.syncStripeSubscription(clubId, {
+      subscriptionId: null,
+      tier: 'FREE',
+      activeUntil: null,
+    })
+
+    console.log(`Subscription ${subscription.id} deleted for club ${clubId}`)
+  } catch (error) {
+    console.error('Failed to handle subscription deleted:', error)
+  }
+}
+
+/**
+ * Handle successful invoice payment
+ */
+async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+  const subscriptionId = invoice.subscription as string
+
+  if (!subscriptionId) {
+    return
+  }
+
+  try {
+    // Reactivate club if it was suspended
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const clubId = subscription.metadata?.clubId
+
+    if (clubId) {
+      const club = await clubService.getClubById(clubId)
+
+      if (club?.isSuspended) {
+        await clubService.reactivateClub(clubId)
+        console.log(`Club ${clubId} reactivated after payment`)
+      }
+    }
+  } catch (error) {
+    console.error('Failed to handle invoice payment succeeded:', error)
+  }
+}
+
+/**
+ * Handle failed invoice payment
+ */
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  const subscriptionId = invoice.subscription as string
+
+  if (!subscriptionId) {
+    return
+  }
+
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const clubId = subscription.metadata?.clubId
+
+    if (clubId) {
+      // Suspend club after payment failure
+      await clubService.suspendClub(clubId, 'Payment failed')
+      console.log(`Club ${clubId} suspended due to payment failure`)
+    }
+  } catch (error) {
+    console.error('Failed to handle invoice payment failed:', error)
+  }
+}
+
+/**
+ * Map Stripe price ID to club tier
+ */
+function mapPriceToTier(priceId: string): 'FREE' | 'BASIC' | 'PREMIUM' | 'ENTERPRISE' {
+  // Map your actual Stripe price IDs here
+  const tierMap: Record<string, 'FREE' | 'BASIC' | 'PREMIUM' | 'ENTERPRISE'> = {
+    [process.env.STRIPE_PRICE_BASIC || 'price_basic']: 'BASIC',
+    [process.env.STRIPE_PRICE_PREMIUM || 'price_premium']: 'PREMIUM',
+    [process.env.STRIPE_PRICE_ENTERPRISE || 'price_enterprise']: 'ENTERPRISE',
+  }
+
+  return tierMap[priceId] || 'FREE'
 }
 
 function generatePaymentConfirmationEmail(registration: any): string {

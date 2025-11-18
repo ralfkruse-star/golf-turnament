@@ -263,64 +263,151 @@ async function syncPendingScores() {
 
 /**
  * Push Notification Handler
+ * Enhanced with rich notifications, grouping, and action handling
  */
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received')
 
-  const data = event.data ? event.data.json() : {}
-  const title = data.title || 'Golf Tournament Update'
-  const options = {
-    body: data.body || 'You have a new tournament notification',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/badge-72x72.png',
-    vibrate: [200, 100, 200],
-    tag: data.tag || 'tournament-notification',
-    data: data,
-    actions: [
-      {
-        action: 'view',
-        title: 'View',
-      },
-      {
-        action: 'close',
-        title: 'Close',
-      },
-    ],
+  if (!event.data) {
+    console.log('[SW] No data in push event')
+    return
   }
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  )
+  try {
+    const data = event.data.json()
+    console.log('[SW] Push data:', data)
+
+    const title = data.title || 'Golf Tournament Update'
+    const options = {
+      body: data.body || 'You have a new tournament notification',
+      icon: data.icon || '/icons/icon-192x192.png',
+      badge: data.badge || '/icons/badge-72x72.png',
+      image: data.image, // Large image for rich notifications
+      vibrate: [200, 100, 200],
+      tag: data.tag || 'tournament-notification', // Group notifications by tag
+      renotify: true, // Vibrate even if previous notification with same tag exists
+      requireInteraction: false, // Auto-dismiss after some time
+      silent: data.silent || false,
+      data: data.data || data, // Store full payload for click handler
+      actions: data.actions || [
+        {
+          action: 'view',
+          title: 'View',
+          icon: '/icons/view-icon.png',
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss',
+          icon: '/icons/close-icon.png',
+        },
+      ],
+      timestamp: data.timestamp || Date.now(),
+    }
+
+    event.waitUntil(
+      self.registration.showNotification(title, options)
+        .then(() => {
+          console.log('[SW] Notification displayed successfully')
+
+          // Track notification display
+          return fetch('/api/analytics/notification-displayed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              tag: options.tag,
+              timestamp: options.timestamp,
+            }),
+          }).catch(err => console.log('[SW] Analytics tracking failed:', err))
+        })
+    )
+  } catch (error) {
+    console.error('[SW] Error handling push notification:', error)
+  }
 })
 
 /**
  * Notification Click Handler
+ * Handles notification clicks and action buttons
  */
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.action)
 
   event.notification.close()
 
-  if (event.action === 'view') {
-    const urlToOpen = event.notification.data?.url || '/'
+  // Determine URL based on action
+  let urlToOpen = '/'
 
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          // Check if there's already a window open
-          for (const client of clientList) {
-            if (client.url === urlToOpen && 'focus' in client) {
-              return client.focus()
-            }
-          }
-
-          // Open new window
-          if (clients.openWindow) {
-            return clients.openWindow(urlToOpen)
-          }
-        })
-    )
+  if (event.action === 'view' || !event.action) {
+    // Main notification click or 'view' action
+    urlToOpen = event.notification.data?.url || '/'
+  } else if (event.action === 'dismiss') {
+    // Just close, no navigation
+    return
+  } else {
+    // Custom action handling
+    urlToOpen = event.notification.data?.actions?.[event.action] || '/'
   }
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // Check if there's already a window/tab open
+        const matchingClient = clientList.find(client => {
+          return client.url === urlToOpen && 'focus' in client
+        })
+
+        if (matchingClient) {
+          return matchingClient.focus()
+        }
+
+        // Check if any client is on the same origin
+        const sameOriginClient = clientList.find(client => {
+          const clientUrl = new URL(client.url)
+          const targetUrl = new URL(urlToOpen, self.location.origin)
+          return clientUrl.origin === targetUrl.origin && 'navigate' in client
+        })
+
+        if (sameOriginClient) {
+          return sameOriginClient.navigate(urlToOpen).then(client => client.focus())
+        }
+
+        // Open new window if no existing client
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen)
+        }
+      })
+      .then(() => {
+        // Track notification click
+        return fetch('/api/analytics/notification-clicked', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tag: event.notification.tag,
+            action: event.action || 'default',
+            timestamp: Date.now(),
+          }),
+        }).catch(err => console.log('[SW] Analytics tracking failed:', err))
+      })
+  )
+})
+
+/**
+ * Notification Close Handler
+ * Track when notifications are dismissed
+ */
+self.addEventListener('notificationclose', (event) => {
+  console.log('[SW] Notification closed:', event.notification.tag)
+
+  event.waitUntil(
+    fetch('/api/analytics/notification-closed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tag: event.notification.tag,
+        timestamp: Date.now(),
+      }),
+    }).catch(err => console.log('[SW] Analytics tracking failed:', err))
+  )
 })
 
 /**

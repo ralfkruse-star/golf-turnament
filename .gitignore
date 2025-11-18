@@ -55,3 +55,4 @@ Thumbs.db
 test-results/
 playwright-report/
 playwright/.cache/
+# Uploaded photos\npublic/uploads/photos/*\n!public/uploads/photos/.gitkeep

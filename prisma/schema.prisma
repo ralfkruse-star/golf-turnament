@@ -135,6 +135,10 @@ model Tournament {
   requireHandicap   Boolean             @default(true)
   maxHandicap       Decimal?            @db.Decimal(4, 1)
 
+  // Multi-club support
+  clubId            String?
+  club              Club?               @relation(fields: [clubId], references: [id])
+
   // Metadata
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -146,9 +150,11 @@ model Tournament {
   flights           Flight[]
   scorecards        Scorecard[]
   sponsors          Sponsor[]
+  photos            Photo[]
 
   @@index([tournamentDate])
   @@index([status])
+  @@index([clubId])
 }
 
 model Course {
@@ -164,10 +170,16 @@ model Course {
   // Hole details
   holeDetails Json     // [{ hole: 1, par: 4, handicap: 10, yardages: { black: 420, white: 380 } }]
 
+  // Multi-club support
+  clubId      String?
+  club        Club?    @relation(fields: [clubId], references: [id])
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   tournaments Tournament[]
+
+  @@index([clubId])
 }
 
 model Flight {
@@ -339,6 +351,10 @@ model User {
   sessions      Session[]
   player        Player?
   tournaments   Tournament[]
+  photos        Photo[]
+  reports       Report[]
+  pushSubscriptions PushSubscription[]
+  clubMemberships ClubMember[]
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -400,4 +416,310 @@ model SyncLog {
 
   @@index([entity, externalId])
   @@index([syncedAt])
+}
+
+// ============================================================================
+// PHOTO GALLERY (Phase 3)
+// ============================================================================
+
+enum PhotoCategory {
+  TOURNAMENT
+  COURSE
+  CLUBHOUSE
+  SOCIAL
+  AWARDS
+  ACTION_SHOT
+}
+
+model Photo {
+  id            String        @id @default(cuid())
+
+  // File information
+  filename      String
+  originalName  String
+  mimeType      String
+  fileSize      Int           // bytes
+  width         Int
+  height        Int
+
+  // Storage
+  url           String        // Original
+  thumbnailUrl  String?       // 200x200
+  mediumUrl     String?       // 800x800
+
+  // Metadata
+  caption       String?       @db.Text
+  category      PhotoCategory @default(TOURNAMENT)
+  takenAt       DateTime?
+
+  // Relations
+  tournamentId  String?
+  tournament    Tournament?   @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  uploadedBy    String?
+  uploader      User?         @relation(fields: [uploadedBy], references: [id])
+  albumId       String?
+  album         Album?        @relation(fields: [albumId], references: [id])
+
+  // Visibility
+  isPublic      Boolean       @default(true)
+  isFeatured    Boolean       @default(false)
+
+  // Moderation
+  approved      Boolean       @default(false)
+  moderatedBy   String?
+  moderatedAt   DateTime?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([tournamentId])
+  @@index([uploadedBy])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  coverPhotoId String?
+
+  // Relations
+  photos      Photo[]
+
+  // Visibility
+  isPublic    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+// ============================================================================
+// ANALYTICS & REPORTS (Phase 3)
+// ============================================================================
+
+enum MetricType {
+  TOURNAMENT_PARTICIPATION
+  PLAYER_PERFORMANCE
+  REVENUE
+  REGISTRATION_CONVERSION
+  SCORECARD_COMPLETION
+  AVERAGE_SCORE
+  HANDICAP_DISTRIBUTION
+}
+
+model AnalyticsMetric {
+  id          String     @id @default(cuid())
+  metricType  MetricType
+
+  // Dimensions
+  tournamentId String?
+  playerId     String?
+  date         DateTime
+
+  // Metric values
+  value        Decimal    @db.Decimal(10, 2)
+  count        Int?
+  metadata     Json?      // Additional metric-specific data
+
+  createdAt    DateTime   @default(now())
+
+  @@index([metricType, date])
+  @@index([tournamentId])
+  @@index([playerId])
+  @@index([date])
+}
+
+enum ReportType {
+  TOURNAMENT_SUMMARY
+  PLAYER_PERFORMANCE
+  FINANCIAL
+  PARTICIPATION_TRENDS
+  HANDICAP_ANALYSIS
+  CUSTOM
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  JSON
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  title       String
+  reportType  ReportType
+  format      ReportFormat @default(PDF)
+
+  // Generation
+  parameters  Json         // Report-specific parameters
+  fileUrl     String?      // Generated report file
+  fileSize    Int?         // bytes
+
+  // Relations
+  generatedBy String?
+  generator   User?        @relation(fields: [generatedBy], references: [id])
+
+  // Metadata
+  generatedAt DateTime     @default(now())
+  expiresAt   DateTime?    // Auto-delete old reports
+
+  @@index([reportType])
+  @@index([generatedBy])
+  @@index([generatedAt])
+}
+
+// ============================================================================
+// PUSH NOTIFICATIONS (Phase 3)
+// ============================================================================
+
+model PushSubscription {
+  id          String   @id @default(cuid())
+
+  // Web Push subscription data
+  endpoint    String   @unique
+  p256dh      String   // Public key
+  auth        String   // Auth secret
+
+  // User relation
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playerId    String?
+
+  // Device info
+  userAgent   String?  @db.Text
+  deviceType  String?  // "mobile", "desktop", "tablet"
+
+  // Preferences
+  enabled     Boolean  @default(true)
+  topics      String[] // ["tournaments", "scores", "announcements"]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastUsedAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([enabled])
+}
+
+model NotificationLog {
+  id          String   @id @default(cuid())
+
+  // Notification details
+  title       String
+  body        String   @db.Text
+  icon        String?
+  badge       String?
+  url         String?  // Click action URL
+
+  // Targeting
+  userId      String?
+  tournamentId String?
+  topic       String?  // Broadcast topic
+
+  // Delivery
+  sentAt      DateTime @default(now())
+  delivered   Int      @default(0) // Count of successful deliveries
+  failed      Int      @default(0) // Count of failed deliveries
+
+  // Metadata
+  metadata    Json?
+
+  @@index([userId])
+  @@index([tournamentId])
+  @@index([sentAt])
+}
+
+// ============================================================================
+// MULTI-CLUB SUPPORT (Phase 4)
+// ============================================================================
+
+enum ClubTier {
+  FREE
+  BASIC
+  PREMIUM
+  ENTERPRISE
+}
+
+model Club {
+  id              String       @id @default(cuid())
+
+  // Basic info
+  name            String
+  slug            String       @unique
+  description     String?      @db.Text
+  logo            String?
+  website         String?
+
+  // Contact
+  email           String
+  phone           String?
+  address         String?
+  city            String?
+  postalCode      String?
+  country         String       @default("DE")
+
+  // Branding (White-label)
+  primaryColor    String?      @default("#16a34a")
+  secondaryColor  String?
+  customDomain    String?      @unique
+
+  // Subscription
+  tier            ClubTier     @default(FREE)
+  subscriptionId  String?      @unique // Stripe subscription ID
+  trialEndsAt     DateTime?
+  activeUntil     DateTime?
+
+  // Features
+  maxTournaments  Int?         // null = unlimited
+  maxPlayers      Int?
+  features        Json         // Feature flags
+
+  // Settings
+  settings        Json?        // Club-specific settings
+
+  // Relations
+  courses         Course[]
+  users           ClubMember[]
+  tournaments     Tournament[]
+
+  // Status
+  isActive        Boolean      @default(true)
+  isSuspended     Boolean      @default(false)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([slug])
+  @@index([tier])
+  @@index([isActive])
+}
+
+enum ClubMemberRole {
+  OWNER
+  ADMIN
+  MANAGER
+  STAFF
+  MEMBER
+}
+
+model ClubMember {
+  id        String         @id @default(cuid())
+
+  clubId    String
+  club      Club           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role      ClubMemberRole @default(MEMBER)
+
+  joinedAt  DateTime       @default(now())
+
+  @@unique([clubId, userId])
+  @@index([clubId])
+  @@index([userId])
 }

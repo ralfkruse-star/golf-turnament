@@ -21,6 +21,7 @@ export interface TournamentFilters {
   dateFrom?: Date
   dateTo?: Date
   category?: string
+  clubId?: string
 }
 
 export class PrismaTournamentRepository implements TournamentRepository {
@@ -82,6 +83,11 @@ export class PrismaTournamentRepository implements TournamentRepository {
   async findAll(filters?: TournamentFilters): Promise<Tournament[]> {
     const where: any = {}
 
+    // IMPORTANT: Filter by clubId for multi-tenancy
+    if (filters?.clubId) {
+      where.clubId = filters.clubId
+    }
+
     if (filters?.status && filters.status.length > 0) {
       where.status = { in: filters.status }
     }
@@ -108,13 +114,20 @@ export class PrismaTournamentRepository implements TournamentRepository {
     return records.map((r) => this.toDomain(r))
   }
 
-  async findActive(): Promise<Tournament[]> {
-    const records = await prisma.tournament.findMany({
-      where: {
-        status: {
-          in: ['OPEN_FOR_REGISTRATION', 'REGISTRATION_CLOSED', 'IN_PROGRESS'],
-        },
+  async findActive(clubId?: string): Promise<Tournament[]> {
+    const where: any = {
+      status: {
+        in: ['OPEN_FOR_REGISTRATION', 'REGISTRATION_CLOSED', 'IN_PROGRESS'],
       },
+    }
+
+    // IMPORTANT: Filter by clubId for multi-tenancy
+    if (clubId) {
+      where.clubId = clubId
+    }
+
+    const records = await prisma.tournament.findMany({
+      where,
       orderBy: { tournamentDate: 'asc' },
     })
 
