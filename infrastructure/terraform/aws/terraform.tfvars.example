@@ -1,0 +1,124 @@
+# ============================================================================
+# Terraform Variables Example
+# ============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# NEVER commit terraform.tfvars to git!
+# ============================================================================
+
+# ============================================================================
+# General Configuration
+# ============================================================================
+
+environment = "production"
+aws_region  = "us-east-1"
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["us-east-1a", "us-east-1b", "us-east-1c"]
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+
+# ============================================================================
+# Domain Configuration
+# ============================================================================
+
+domain_name         = "yourdomain.com"
+acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# ============================================================================
+# ECS Configuration
+# ============================================================================
+
+container_image   = "123456789012.dkr.ecr.us-east-1.amazonaws.com/golf-tournament:latest"
+ecs_desired_count = 2
+ecs_min_capacity  = 2
+ecs_max_capacity  = 10
+ecs_task_cpu      = 1024  # 1 vCPU
+ecs_task_memory   = 2048  # 2 GB
+
+# ============================================================================
+# RDS Configuration
+# ============================================================================
+
+rds_instance_class    = "db.t3.medium"
+rds_allocated_storage = 100
+rds_multi_az          = true
+db_master_username    = "postgres"
+db_master_password    = "CHANGE_ME_STRONG_PASSWORD"  # Use AWS Secrets Manager in production
+
+# ============================================================================
+# Application Secrets
+# ============================================================================
+# Generate these with the commands shown in comments
+
+# Generate with: openssl rand -base64 32
+nextauth_secret = "CHANGE_ME_GENERATED_SECRET"
+
+# From Brevo dashboard
+brevo_api_key      = "xkeysib-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+brevo_sender_email = "noreply@yourdomain.com"
+brevo_sender_name  = "Golf Club Name"
+
+# From Stripe dashboard
+stripe_secret_key      = "sk_live_your_stripe_secret_key_here"
+stripe_publishable_key = "pk_live_your_stripe_publishable_key_here"
+stripe_webhook_secret  = "whsec_your_stripe_webhook_secret_here"
+
+# Generate with: pnpm generate-vapid
+vapid_public_key  = "BXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+vapid_private_key = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+vapid_subject     = "mailto:admin@yourdomain.com"
+
+# Generate with: openssl rand -hex 32
+cron_secret = "CHANGE_ME_GENERATED_CRON_SECRET"
+
+# ============================================================================
+# Monitoring Configuration
+# ============================================================================
+
+log_retention_days = 30
+
+# ============================================================================
+# Notes
+# ============================================================================
+#
+# 1. BEFORE DEPLOYING:
+#    - Update all CHANGE_ME values
+#    - Generate all secrets with proper commands
+#    - Verify domain and certificate ARN
+#    - Review resource sizes for your expected load
+#
+# 2. SECURITY:
+#    - Never commit this file with real values
+#    - Use AWS Secrets Manager for sensitive data in production
+#    - Rotate secrets regularly
+#
+# 3. COST OPTIMIZATION:
+#    - Start with smaller instance sizes
+#    - Enable Multi-AZ only in production
+#    - Use reserved instances for predictable workloads
+#
+# 4. SIZING GUIDE:
+#
+#    Small (0-1000 users):
+#      - ecs_task_cpu: 512 (0.5 vCPU)
+#      - ecs_task_memory: 1024 (1 GB)
+#      - rds_instance_class: db.t3.small
+#      - ecs_desired_count: 2
+#
+#    Medium (1000-10000 users):
+#      - ecs_task_cpu: 1024 (1 vCPU)
+#      - ecs_task_memory: 2048 (2 GB)
+#      - rds_instance_class: db.t3.medium
+#      - ecs_desired_count: 2-4
+#
+#    Large (10000+ users):
+#      - ecs_task_cpu: 2048 (2 vCPU)
+#      - ecs_task_memory: 4096 (4 GB)
+#      - rds_instance_class: db.m5.large
+#      - ecs_desired_count: 4-10
+#
+# ============================================================================

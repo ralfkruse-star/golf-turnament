@@ -1,5 +1,13 @@
 # ⛳ Golf Tournament Management System
 
+[![CI](https://github.com/YOUR_USERNAME/golf-turnament/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/golf-turnament/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/golf-turnament/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/golf-turnament)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org)
+[![Next.js](https://img.shields.io/badge/Next.js-14.2-black.svg)](https://nextjs.org)
+[![Prisma](https://img.shields.io/badge/Prisma-6.0-2D3748.svg)](https://www.prisma.io)
+
 ## Golfplatz Siek - Digitales Turnier-Management
 
 Ein modernes, vollständiges Tournament-Management-System für Golfplätze mit Fokus auf **Echtzeit-Scoring**, **Mobile-First-UX** und **DSGVO-Konformität**.
@@ -309,28 +317,112 @@ Siehe [prisma/schema.prisma](./prisma/schema.prisma) für vollständiges Schema.
 
 ```bash
 # Development
-pnpm dev              # Dev-Server (http://localhost:3000)
-pnpm build            # Production Build
-pnpm start            # Production Server
-pnpm lint             # ESLint
-pnpm type-check       # TypeScript Check
+pnpm dev                    # Dev-Server (http://localhost:3000)
+pnpm build                  # Production Build
+pnpm start                  # Production Server
+
+# Code Quality
+pnpm lint                   # ESLint (with auto-fix)
+pnpm lint:check            # ESLint check only
+pnpm lint:fix              # ESLint with fixes
+pnpm format                # Format with Prettier
+pnpm format:check          # Check formatting
+pnpm type-check            # TypeScript type checking
+pnpm validate              # Run all quality checks
 
 # Testing
-pnpm test             # Unit Tests (Vitest)
-pnpm test:ui          # Vitest UI
-pnpm test:e2e         # E2E Tests (Playwright)
+pnpm test                  # Unit Tests (Vitest)
+pnpm test:ui               # Vitest UI
+pnpm test:coverage         # Tests with coverage
+pnpm test:integration      # Integration tests
+pnpm test:e2e              # E2E Tests (Playwright)
+pnpm test:e2e:headless     # E2E Tests headless mode
+pnpm test:e2e:ui           # E2E Tests with UI
+pnpm test:smoke            # Smoke tests
+pnpm test:all              # Run all tests
+
+# Analysis
+pnpm analyze               # Analyze bundle size
+pnpm analyze:bundle        # Generate bundle analysis
+pnpm check:bundle-size     # Check bundle size thresholds
+pnpm lighthouse            # Run Lighthouse CI
 
 # Database
-pnpm db:push          # Push Schema (Dev)
-pnpm db:migrate       # Run Migrations
-pnpm db:studio        # Prisma Studio (GUI)
-pnpm db:seed          # Seed Database
+pnpm db:push               # Push Schema (Dev)
+pnpm db:migrate            # Run Migrations
+pnpm db:migrate:deploy     # Deploy migrations
+pnpm db:migrate:reset      # Reset database
+pnpm db:studio             # Prisma Studio (GUI)
+pnpm db:seed               # Seed Database
+pnpm db:generate           # Generate Prisma Client
+
+# Utilities
+pnpm clean                 # Clean build artifacts
+pnpm prepare               # Setup Husky hooks
 
 # Docker
-docker-compose up     # Start all services
-docker-compose up db  # Start DB only
+docker-compose up          # Start all services
+docker-compose up db       # Start DB only
 docker build -t golf-tournament .
 ```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline with automated testing, code quality checks, and deployment workflows.
+
+### Automated Checks
+
+Every push and pull request triggers:
+
+- **Code Quality**: ESLint, Prettier, TypeScript checks
+- **Unit Tests**: Vitest with 80% coverage threshold
+- **Integration Tests**: Database-backed integration tests
+- **E2E Tests**: Playwright browser tests
+- **Security Scan**: CodeQL, npm audit, secret scanning
+- **Bundle Analysis**: Size checks and optimization monitoring
+- **Database Schema**: Prisma schema validation
+
+### Workflows
+
+- **CI Workflow** (`.github/workflows/ci.yml`): Runs on every push
+- **PR Workflow** (`.github/workflows/pr.yml`): Enhanced PR validation
+- **Staging Deploy** (`.github/workflows/deploy-staging.yml`): Auto-deploy to staging
+- **Production Deploy** (`.github/workflows/deploy-production.yml`): Production deployments
+
+### Pre-commit Hooks
+
+Git hooks ensure code quality before commits:
+
+```bash
+# Automatically runs on git commit
+- Lint staged files
+- Format code with Prettier
+- Type check
+- Run affected tests
+
+# Automatically runs on git push
+- Run all tests
+- Verify build
+- Check for merge conflicts
+```
+
+### Coverage Reports
+
+- View coverage locally: `open coverage/index.html`
+- CI uploads coverage to Codecov
+- PRs include coverage diff comments
+
+### Documentation
+
+For detailed CI/CD information, see [docs/CI_CD.md](./docs/CI_CD.md):
+- Workflow explanations
+- Adding new checks
+- Debugging failures
+- Deployment process
+- Environment variables
+- Secrets management
 
 ---
 

@@ -11,8 +11,8 @@ env:
   PNPM_VERSION: '9'
 
 jobs:
-  lint-and-typecheck:
-    name: Lint & Type Check
+  code-quality:
+    name: Code Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,10 +30,17 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: pnpm lint
+        run: pnpm lint:check
+        continue-on-error: false
+
+      - name: Check Prettier formatting
+        run: pnpm format:check
 
       - name: Type check
         run: pnpm type-check
+
+      - name: Check for unused imports
+        run: pnpm lint:unused
 
   unit-tests:
     name: Unit Tests
@@ -53,13 +60,47 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run unit tests
-        run: pnpm test
+      - name: Run unit tests with coverage
+        run: pnpm test:coverage
 
-  build:
-    name: Build Application
+      - name: Check coverage thresholds
+        run: pnpm test:coverage:check
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: coverage/
+          retention-days: 30
+
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, unit-tests]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: golf_tournament_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -78,24 +119,32 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm prisma generate
 
-      - name: Build Next.js
-        run: pnpm build
+      - name: Run database migrations
+        run: pnpm prisma migrate deploy
         env:
-          DATABASE_URL: postgresql://user:pass@localhost:5432/db
+          DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
+
+      - name: Seed test data
+        run: pnpm db:seed
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
+
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
           NEXTAUTH_SECRET: test-secret
           NEXTAUTH_URL: http://localhost:3000
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: .next/
-          retention-days: 7
+      - name: Cleanup database
+        if: always()
+        run: pnpm prisma migrate reset --force --skip-seed
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
 
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [build]
     services:
       postgres:
         image: postgres:16
@@ -129,22 +178,190 @@ jobs:
       - name: Install Playwright Browsers
         run: pnpm playwright install --with-deps chromium
 
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
       - name: Run database migrations
         run: pnpm prisma migrate deploy
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
 
-      - name: Run E2E tests
-        run: pnpm test:e2e
+      - name: Run E2E tests (Chromium only in CI)
+        run: pnpm test:e2e:chromium
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/golf_tournament_test
           NEXTAUTH_SECRET: test-secret
           NEXTAUTH_URL: http://localhost:3000
+          CI: true
 
-      - name: Upload test results
-        if: failure()
+      - name: Upload test artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots
+          path: test-results/
+          retention-days: 7
+
+  build-verification:
+    name: Build Verification
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
+      - name: Build Next.js application
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/db
+          NEXTAUTH_SECRET: test-secret
+          NEXTAUTH_URL: http://localhost:3000
+
+      - name: Analyze bundle size
+        run: pnpm analyze:bundle
+
+      - name: Check bundle size threshold
+        run: pnpm check:bundle-size
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: .next/
+          retention-days: 7
+
+      - name: Upload bundle analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: .next/analyze/
+          retention-days: 30
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run npm audit
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Dependency vulnerability scan
+        run: pnpm audit --json > audit-results.json
+        continue-on-error: true
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit
+          path: audit-results.json
+          retention-days: 30
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+      - name: Secret scanning with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  database-schema-check:
+    name: Database Schema Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate Prisma schema
+        run: pnpm prisma validate
+
+      - name: Check for schema drift
+        run: pnpm prisma format --check
+
+      - name: Generate Prisma Client
+        run: pnpm prisma generate
+
+      - name: Check for pending migrations
+        run: |
+          if [ -n "$(git status --porcelain prisma/migrations)" ]; then
+            echo "Warning: Uncommitted migrations detected"
+            exit 1
+          fi
+
+  all-checks-passed:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs:
+      - code-quality
+      - unit-tests
+      - integration-tests
+      - e2e-tests
+      - build-verification
+      - security-scan
+      - database-schema-check
+    if: always()
+    steps:
+      - name: Check if all jobs succeeded
+        run: |
+          if [[ "${{ needs.code-quality.result }}" != "success" ]] || \
+             [[ "${{ needs.unit-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.integration-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.e2e-tests.result }}" != "success" ]] || \
+             [[ "${{ needs.build-verification.result }}" != "success" ]] || \
+             [[ "${{ needs.security-scan.result }}" != "success" ]] || \
+             [[ "${{ needs.database-schema-check.result }}" != "success" ]]; then
+            echo "One or more checks failed"
+            exit 1
+          fi
+          echo "All checks passed successfully!"

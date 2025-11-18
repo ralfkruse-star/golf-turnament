@@ -1,0 +1,103 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+
+    # Group dependencies by type
+    groups:
+      # Production dependencies
+      production-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier"
+          - "@testing-library/*"
+          - "vitest"
+          - "playwright"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Development dependencies
+      development-dependencies:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Testing dependencies
+      testing-dependencies:
+        patterns:
+          - "@testing-library/*"
+          - "vitest"
+          - "playwright"
+          - "@vitest/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+    # Commit message preferences
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
+
+    # Labels for PRs
+    labels:
+      - "dependencies"
+      - "automated"
+
+    # Reviewers
+    reviewers:
+      - "your-github-username"
+
+    # Ignore specific dependencies
+    ignore:
+      # Ignore major version updates for now
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+    # Allow specific dependency updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci"
+      - "automated"
+
+  # Enable version updates for Docker (if using)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    commit-message:
+      prefix: "chore(docker)"
+      include: "scope"
+    labels:
+      - "docker"
+      - "automated"

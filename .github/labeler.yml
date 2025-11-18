@@ -1,0 +1,72 @@
+# Auto-label PRs based on changed files
+
+# Source code changes
+"code":
+  - "app/**"
+  - "components/**"
+  - "lib/**"
+  - "domain/**"
+  - "infrastructure/**"
+
+# Frontend changes
+"frontend":
+  - "app/**"
+  - "components/**"
+
+# Backend/API changes
+"backend":
+  - "app/api/**"
+  - "lib/**"
+  - "domain/**"
+  - "infrastructure/**"
+
+# Database changes
+"database":
+  - "prisma/**"
+  - "**/*migration*"
+
+# Tests
+"tests":
+  - "tests/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+
+# Documentation
+"documentation":
+  - "**.md"
+  - "docs/**"
+
+# Configuration
+"config":
+  - "**.json"
+  - "**.yml"
+  - "**.yaml"
+  - "**.config.*"
+
+# CI/CD
+"ci/cd":
+  - ".github/**"
+
+# Dependencies
+"dependencies":
+  - "package.json"
+  - "pnpm-lock.yaml"
+
+# Styling
+"styling":
+  - "**/*.css"
+  - "tailwind.config.*"
+
+# TypeScript
+"typescript":
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "tsconfig.json"
+
+# Security
+"security":
+  - ".env.example"
+  - "**/*auth*"
+  - "**/*security*"

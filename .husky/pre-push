@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push checks..."
+
+# Run all tests
+echo "🧪 Running tests..."
+pnpm test
+
+# Verify build
+echo "🏗️ Verifying build..."
+pnpm build
+
+# Check for merge conflicts
+echo "🔍 Checking for merge conflicts..."
+if git diff --check; then
+  echo "✅ No merge conflicts found"
+else
+  echo "❌ Merge conflicts detected"
+  exit 1
+fi
+
+echo "✅ Pre-push checks passed!"
