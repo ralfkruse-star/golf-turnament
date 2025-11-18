@@ -37,10 +37,19 @@ Ein modernes, vollständiges Tournament-Management-System für Golfplätze mit F
 - 📦 Repository Pattern für Datenpersistenz
 - 🔧 Invarianten-Validierung auf Domain-Ebene
 
+#### Email & Marketing (NEW! 🎉)
+- 📧 **Brevo Integration** (Transactional & Marketing Emails)
+- ✉️ Turnierbestätigungen, Erinnerungen, Ergebnisse
+- 👥 Automatische Contact-Synchronisation
+- 📊 Email Analytics (Öffnungsraten, Klicks, Bounces)
+- 🔔 Webhook-basierte Event-Verarbeitung
+- 🌍 DSGVO-konforme Unsubscribe-Verwaltung
+
 #### Technische Exzellenz
 - 🚀 **Next.js 14** (App Router, Server Components)
 - 💾 **PostgreSQL + Prisma ORM** (Type-Safe)
 - 🎨 **Tailwind CSS + shadcn/ui** (Accessible Components)
+- 📧 **Brevo (Sendinblue)** (Email Service)
 - 🧪 **Vitest + Playwright** (Unit & E2E Tests)
 - 🐳 **Docker** + **Docker Compose** (Deployment-Ready)
 - ⚙️ **GitHub Actions CI/CD** (Automated Testing)
@@ -68,7 +77,9 @@ pnpm install
 
 # Environment-Variablen konfigurieren
 cp .env.example .env
-# .env bearbeiten und DATABASE_URL setzen
+# .env bearbeiten:
+# - DATABASE_URL für PostgreSQL
+# - BREVO_API_KEY für Email-Service (optional für lokale Entwicklung)
 ```
 
 ### 2. Datenbank Setup
@@ -378,6 +389,7 @@ DGV_API_KEY=xxx
 | **Backend** | Next.js API Routes | Unified codebase, keine CORS-Issues |
 | **Database** | PostgreSQL 16 + Prisma | ACID, Type-Safety, Migrations |
 | **Styling** | Tailwind CSS + shadcn/ui | Utility-First, Accessible |
+| **Email** | Brevo (Sendinblue) | Transactional & Marketing, DSGVO-konform |
 | **Real-Time** | Server-Sent Events | Simple, reliable, firewall-friendly |
 | **Testing** | Vitest + Playwright | Fast unit tests, reliable E2E |
 | **CI/CD** | GitHub Actions | Native Integration |
@@ -478,7 +490,11 @@ Bitte siehe [CONTRIBUTING.md](./CONTRIBUTING.md) für:
 ## 📞 Support
 
 - **Email**: support@golfplatz-siek.de
-- **Dokumentation**: [/docs](./docs/)
+- **Dokumentation**:
+  - [README](./README.md) - Übersicht & Quick Start
+  - [API Docs](./docs/API.md) - REST API Referenz
+  - [Brevo Setup](./docs/BREVO-SETUP.md) - Email-Integration einrichten
+  - [Architecture](./docs/architecture/) - ADRs & Design-Entscheidungen
 - **Issue Tracker**: GitHub Issues
 
 ---
